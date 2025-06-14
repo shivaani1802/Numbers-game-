@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Number Clouds Game</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap');
+
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: linear-gradient(to top, #87ceeb, #cde6ff);
+    overflow: hidden;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  /* Animated mountains background */
+  body::before, body::after {
+    content: '';
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 150px;
+    background-repeat: repeat-x;
+    background-size: cover;
+    opacity: 0.6;
+    animation-timing-function: linear;
+    z-index: -2;
+  }
+  body::before {
+    background-image: url('https://i.ibb.co/fv01CyG/mountain-layer1.png');
+    animation: moveMountains 80s linear infinite;
+    opacity: 0.4;
+    height: 180px;
+    bottom: 0;
+  }
+  body::after {
+    background-image: url('https://i.ibb.co/tqZT4C1/mountain-layer2.png');
+    animation: moveMountainsBack 150s linear infinite;
+    opacity: 0.6;
+    height: 150px;
+    bottom: 0;
+  }
+
+  @keyframes moveMountains {
+    0% { background-position-x: 0; }
+    100% { background-position-x: 10000px; }
+  }
+  @keyframes moveMountainsBack {
+    0% { background-position-x: 0; }
+    100% { background-position-x: -10000px; }
+  }
+
+  #gameArea {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .cloud {
+    position: absolute;
+    width: 90px;
+    height: 55px;
+    border-radius: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 24px;
+    user-select: none;
+    cursor: pointer;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+  }
+  .cloud:hover {
+    transform: scale(1.1);
+  }
+
+  /* Positive clouds: white with sun peeking from behind left */
+  .positive {
+    background: white;
+    color: #333;
+    position: relative;
+    box-shadow: 0 6px 10px rgba(0,0,0,0.2);
+  }
+  .positive .icon {
+    position: absolute;
+    left: -28px;  /* peeking from left */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    fill: #FFD93B; /* warm yellow */
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.15));
+  }
+
+  /* Negative clouds: black with thunderbolt peeking from behind left */
+  .negative {
+    background: #111;
+    color: #ffdd00;
+    position: relative;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.8);
+  }
+  .negative .icon {
+    position: absolute;
+    left: -24px;  /* peeking from left */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    fill: #ffdd00;
+    filter: drop-shadow(0 0 4px rgba(255, 221, 0, 0.9));
+  }
+
+  /* UI */
+  #scoreboard, #timer, #missed {
+    position: fixed;
+    top: 14px;
+    left: 20px;
+    font-weight: 600;
+    font-size: 20px;
+    color: #222;
+    text-shadow: 0 0 4px #fff;
+    user-select: none;
+    z-index: 10;
+  }
+  #timer {
+    left: auto;
+    right: 20px;
+  }
+  #missed {
+    top: 48px;
+    left: 20px;
+    color: #a00;
+    display: none;
+  }
+
+  #modeToggle {
+    position: fixed;
+    bottom: 14px;
+    left: 20px;
+    font-weight: 600;
+    font-size: 18px;
+    padding: 6px 14px;
+    background: #fff;
+    border: none;
+    border-radius: 18px;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+    user-select: none;
+    z-index: 10;
+  }
+
+  #restartBtn {
+    position: fixed;
+    bottom: 14px;
+    right: 20px;
+    font-weight: 600;
+    font-size: 18px;
+    padding: 6px 14px;
+    background: #ffbb33;
+    border: none;
+    border-radius: 18px;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    user-select: none;
+    z-index: 10;
+  }
+
+  #gameOver {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255 255 255 / 0.95);
+    padding: 36px 48px;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    font-weight: 700;
+    font-size: 24px;
+    color: #222;
+    display: none;
+    text-align: center;
+    z-index: 20;
+  }
+
+  /* Particle effect */
+  .particle {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.9;
+    will-change: transform, opacity;
+    z-index: 15;
+  }
+</style>
+</head>
+<body>
+<div id="gameArea"></div>
+
+<div id="scoreboard">Score: 0</div>
+<div id="timer">Time: 60</div>
+<div id="missed">Missed: 0</div>
+
+<button id="modeToggle">Mode: Timed</button>
+<button id="restartBtn">Restart</button>
+
+<div id="gameOver">
+  <div id="finalScore">Your final score: 0</div>
+  <br />
+  <button id="restartBtn2">Play Again</button>
+</div>
+
+<script>
+(() => {
+  const gameArea = document.getElementById('gameArea');
+  const scoreboard = document.getElementById('scoreboard');
+  const timerDisplay = document.getElementById('timer');
+  const missedDisplay = document.getElementById('missed');
+  const modeToggleBtn = document.getElementById('modeToggle');
+  const restartBtn = document.getElementById('restartBtn');
+  const gameOverDisplay = document.getElementById('gameOver');
+  const finalScoreDisplay = document.getElementById('finalScore');
+  const restartBtn2 = document.getElementById('restartBtn2');
+
+  let score = 0;
+  let gameTime = 60;
+  let spawnInterval = 1500;
+  let fallSpeed = 2;
+  let missedCount = 0;
+  const missedLimit = 10;
+  let gameRunning = false;
+  let mode = 'timed'; // 'timed' or 'endless'
+
+  let spawnTimer = null;
+  let countdownTimer = null;
+
+  // Utilities
+  function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  // SVG Icons
+  const sunSVG = `<svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" >
+    <circle cx="12" cy="12" r="5" />
+    <g stroke="#FFD93B" stroke-width="2">
+      <line x1="12" y1="1" x2="12" y2="4" />
+      <line x1="12" y1="20" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="6.34" y2="6.34" />
+      <line x1="17.66" y1="17.66" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="4" y2="12" />
+      <line x1="20" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="6.34" y2="17.66" />
+      <line x1="17.66" y1="6.34" x2="19.78" y2="4.22" />
+    </g>
+  </svg>`;
+
+  const thunderSVG = `<svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" >
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>`;
+
+  // Spawn cloud
+  function spawnItem() {
+    if (!gameRunning) return;
+
+    const cloud = document.createElement('div');
+    cloud.classList.add('cloud');
+
+    // Random number -10 to 10 excluding 0
+    let num = 0;
+    while (num === 0) {
+      num = randomInt(-10, 10);
+    }
+
+    if (num > 0) {
+      cloud.classList.add('positive');
+      cloud.innerHTML = `${num}${sunSVG}`;
+    } else {
+      cloud.classList.add('negative');
+      cloud.innerHTML = `${num}${thunderSVG}`;
+    }
+
+    // Random horizontal spawn position inside screen width minus cloud width (approx 100px)
+    const maxX = window.innerWidth - 100;
+    const posX = randomInt(10, maxX);
+    cloud.style.left = posX + 'px';
+    cloud.style.top = '-60px';
+
+    gameArea.appendChild(cloud);
+
+    return cloud;
+  }
+
+  // Update UI
+  function updateScore() {
+    scoreboard.textContent = `Score: ${score}`;
+  }
+  function updateTimer() {
+    if (mode === 'timed') {
+      timerDisplay.textContent = `Time: ${gameTime}`;
+    } else {
+      timerDisplay.textContent = '';
+    }
+  }
+  function updateMissed() {
+    if (mode === 'endless') {
+      missedDisplay.style.display = 'block';
+      missedDisplay.textContent = `Missed: ${missedCount}`;
+    } else {
+      missedDisplay.style.display = 'none';
+    }
+  }
+
+  // Catch cloud
+  function catchItem(cloud) {
+    if (!gameRunning) return;
+    const numText = cloud.childNodes[0].textContent || cloud.textContent;
+    // Parsing number only from cloud's text (ignore svg)
+    const num = parseInt(numText);
+    if (isNaN(num)) return;
+
+    score += num;
+    updateScore();
+
+    createParticles(cloud, cloud.classList.contains('positive') ? '#4a90e2' : '#ffdd00');
+    cloud.remove();
+  }
+
+  // Fall animation
+  function fall() {
+    if (!gameRunning) return;
+    const items = document.querySelectorAll('.cloud');
+
+    items.forEach(elem => {
+      let top = parseFloat(elem.style.top);
+      top += fallSpeed;
+      elem.style.top = top + 'px';
+
+      if (top > window.innerHeight) {
+        missedCount++;
+        if (mode === 'endless' && missedCount >= missedLimit) {
+          endGame();
+        }
+        updateMissed();
+        elem.remove();
+      }
+    });
+
+    requestAnimationFrame(fall);
+  }
+
+  // Swipe detection helpers
+  function distance(p1, p2) {
+    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+  }
+  function pointLineDistance(p, a, b) {
+    const A = p.x - a.x;
+    const B = p.y - a.y;
+    const C = b.x - a.x;
+    const D = b.y - a.y;
+
+    const dot = A * C + B * D;
+    const len_sq = C * C + D * D;
+    let param = -1;
+    if (len_sq !== 0) param = dot / len_sq;
+
+    let xx, yy;
+
+    if (param < 0) {
+      xx = a.x;
+      yy = a.y;
+    } else if (param > 1) {
+      xx = b.x;
+      yy = b.y;
+    } else {
+      xx = a.x + param * C;
+      yy = a.y + param * D;
+    }
+
+    return distance(p, { x: xx, y: yy });
+  }
+  function checkSwipeHits(points) {
+    if (!gameRunning) return;
+    if (points.length < 2) return;
+
+    const items = document.querySelectorAll('.cloud');
+
+    for (const elem of items) {
+      const rect = elem.getBoundingClientRect();
+      const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      for (let i = 0; i < points.length - 1; i++) {
+        const distToLine = pointLineDistance(center, points[i], points[i+1]);
+        if (distToLine < 40) {
+          catchItem(elem);
+          break;
+        }
+      }
+    }
+  }
+
+  // Particles
+  function createParticles(elem, color) {
+    const rect = elem.getBoundingClientRect();
+    const particlesCount = 15;
+    for (let i = 0; i < particlesCount; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.backgroundColor = color;
+      p.style.width = '6px';
+      p.style.height = '6px';
+      p.style.left = rect.left + rect.width / 2 + 'px';
+      p.style.top = rect.top + rect.height / 2 + 'px';
+      gameArea.appendChild(p);
+
+      const angle = Math.random() * 2 * Math.PI;
+      const radius = Math.random() * 40 + 20;
+      const duration = Math.random() * 400 + 600;
+
+      p.animate([
+        { transform: 'translate(0, 0)', opacity: 1 },
+        { transform: `translate(${Math.cos(angle) * radius}px, ${Math.sin(angle) * radius}px)`, opacity: 0 }
+      ], { duration, easing: 'ease-out' });
+
+      setTimeout(() => p.remove(), duration);
+    }
+  }
+
+  // Game loop timers
+  function startSpawning() {
+    spawnTimer = setInterval(() => {
+      spawnItem();
+    }, spawnInterval);
+  }
+  function stopSpawning() {
+    clearInterval(spawnTimer);
+    spawnTimer = null;
+  }
+  function startCountdown() {
+    countdownTimer = setInterval(() => {
+      if (gameTime > 0) {
+        gameTime--;
+        updateTimer();
+      } else {
+        endGame();
+      }
+    }, 1000);
+  }
+  function stopCountdown() {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+
+  // Start Game
+  function startGame() {
+    score = 0;
+    missedCount = 0;
+    gameTime = 60;
+    updateScore();
+    updateMissed();
+    updateTimer();
+    gameOverDisplay.style.display = 'none';
+    gameRunning = true;
+    startSpawning();
+    if (mode === 'timed') {
+      startCountdown();
+      missedDisplay.style.display = 'none';
+    } else {
+      missedDisplay.style.display = 'block';
+    }
+    fall();
+  }
+
+  // End Game
+  function endGame() {
+    gameRunning = false;
+    stopSpawning();
+    stopCountdown();
+    // Remove remaining clouds
+    document.querySelectorAll('.cloud').forEach(c => c.remove());
+    finalScoreDisplay.textContent = `Your final score: ${score}`;
+    gameOverDisplay.style.display = 'block';
+  }
+
+  // Event listeners
+  gameArea.addEventListener('click', e => {
+    if (!gameRunning) return;
+    const target = e.target.closest('.cloud');
+    if (target) {
+      catchItem(target);
+    }
+  });
+
+  // Swipe detection
+  let swipePoints = [];
+  let isSwiping = false;
+
+  function pointerDown(e) {
+    if (!gameRunning) return;
+    swipePoints = [{ x: e.clientX, y: e.clientY }];
+    isSwiping = true;
+  }
+  function pointerMove(e) {
+    if (!isSwiping) return;
+    swipePoints.push({ x: e.clientX, y: e.clientY });
+    if (swipePoints.length > 10) swipePoints.shift();
+    checkSwipeHits(swipePoints);
+  }
+  function pointerUp(e) {
+    if (!isSwiping) return;
+    isSwiping = false;
+    swipePoints = [];
+  }
+
+  gameArea.addEventListener('pointerdown', pointerDown);
+  gameArea.addEventListener('pointermove', pointerMove);
+  gameArea.addEventListener('pointerup', pointerUp);
+  gameArea.addEventListener('pointercancel', pointerUp);
+  gameArea.addEventListener('pointerleave', pointerUp);
+
+  modeToggleBtn.addEventListener('click', () => {
+    if (gameRunning) return;
+    if (mode === 'timed') {
+      mode = 'endless';
+      modeToggleBtn.textContent = 'Mode: Endless';
+      missedDisplay.style.display = 'block';
+    } else {
+      mode = 'timed';
+      modeToggleBtn.textContent = 'Mode: Timed';
+      missedDisplay.style.display = 'none';
+    }
+  });
+
+  restartBtn.addEventListener('click', () => {
+    if (gameRunning) {
+      endGame();
+    }
+    startGame();
+  });
+
+  restartBtn2.addEventListener('click', () => {
+    gameOverDisplay.style.display = 'none';
+    startGame();
+  });
+
+  // Start first game automatically
+  startGame();
+
+  // Adjust cloud spawn rate & fall speed on window resize (optional)
+  window.addEventListener('resize', () => {
+    // could adjust spawnInterval or fallSpeed if desired
+  });
+})();
+</script>
+</body>
+</html>
